@@ -769,56 +769,76 @@ public function gigsDetails($id)
 
     public function acceptBid(Request $request)
     {
-        Stripe::setApiKey('***REMOVED***');
+        // ✅ Validation (basic)
+        $validator = Validator::make($request->all(), [
+            'amount'      => 'required|numeric|min:1',
+            'stripeToken' => 'required|string',
+            'id'          => 'required|integer|exists:bid_proposals,id',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->with('error', $validator->errors()->first());
+        }
+
+        // ✅ Secret key env se
+        Stripe::setApiKey(config('services.stripe.secret'));
 
         try {
-            // Create a charge
+            // ⚠️ Amount ko cents me convert karo (USD example)
+            $amountInCents = (int) round($request->amount * 100);
+
+            // ⚠️ Charges API legacy hai; abhi ke code ko minimal change ke liye as-is rakha:
             $charge = Charge::create([
-                'amount' => $request->amount * 100, // Amount in cents
-                'currency' => 'usd',
-                'source' => $request->stripeToken,
-                'description' => 'Test payment',
+                'amount'      => $amountInCents,
+                'currency'    => 'usd',             // apni currency set karo, e.g. 'inr'
+                'source'      => $request->stripeToken,
+                'description' => 'Bid acceptance payment',
+                // 'metadata' => ['bid_proposal_id' => $request->id], // helpful for reconciliation
             ]);
 
-
+            // ====== Aapka existing business logic ======
             $user = Auth::user();
-            $bid_proposal = BidProposal::where('id', $request->id)->first();
+
+            $bid_proposal = BidProposal::findOrFail($request->id);
             $bid_proposal->status = 1;
             $bid_proposal->save();
-    
-            $bid = Bid::where('id', $bid_proposal->bid_id)->first();
-            
+
+            $bid = Bid::findOrFail($bid_proposal->bid_id);
+
             $timestamp = Carbon::now()->format('dmyHis');
-            $transactionId = 'SWBI'.$user->id.''.$timestamp;
-    
+            $transactionId = 'SWBI' . $user->id . $timestamp;
+
             $add_transaction = new Transaction();
-            $add_transaction->business_id = $user->id;
-            $add_transaction->influencer_id = $bid_proposal->sender_id;
-            $add_transaction->type = "Bid";
-            $add_transaction->details = "Bid accepted, Title - " .$bid->title;
+            $add_transaction->business_id    = $user->id;
+            $add_transaction->influencer_id  = $bid_proposal->sender_id;
+            $add_transaction->type           = "Bid";
+            $add_transaction->details        = "Bid accepted, Title - " . ($bid->title ?? 'N/A');
             $add_transaction->transaction_id = $transactionId;
-            $add_transaction->amount = $request->amount;
-            $add_transaction->save();    
+            $add_transaction->amount         = $request->amount;
+            $add_transaction->save();
 
             $paymentRequest = new PaymentRequest();
-            $paymentRequest->made_by = $user->id;
-            $paymentRequest->payment_to = $bid_proposal->sender_id;
-            $paymentRequest->amount = $request->amount;
+            $paymentRequest->made_by         = $user->id;
+            $paymentRequest->payment_to      = $bid_proposal->sender_id;
+            $paymentRequest->amount          = $request->amount;
             $paymentRequest->bid_proposal_id = $request->id;
             $paymentRequest->save();
 
             $notification = new Notification();
             $notification->user_id = $bid_proposal->sender_id;
-            $notification->title = $user->first_name. ' ' .$user->last_name. ' accepted your bid proposal.';
-            $notification->link = 'bid-details/'. $bid->id;
+            $notification->title   = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) . ' accepted your bid proposal.';
+            $notification->link    = 'bid-details/' . $bid->id;
             $notification->save();
-            
-            return redirect()->back()->with('success', 'Payment Successfull.');
 
-        } catch (\Exception $e) {
+            return redirect()->back()->with('success', 'Payment Successful.');
+
+        } catch (\Throwable $e) {
+            // ⚠️ User ko generic error, logs me detail
+            // \Log::error('Stripe payment failed', ['error' => $e->getMessage()]);
             return back()->with('error', $e->getMessage());
         }
     }
+
 
     public function declineBid(Request $request)
     {
@@ -890,106 +910,160 @@ public function gigsDetails($id)
         return response()->json(['success' => false, 'message' => 'Invalid coupon code!', 'discounted_price' => number_format($request->price, 2)]);
     }
 
-    public function processPayment(Request $request)
-    {
-        // $request->validate([
-        //     'card_name' => 'required|string',
-        //     'card_number' => 'required|digits:16',
-        //     'cvc' => 'required|digits:3',
-        //     'exp_month' => 'required|numeric|min:1|max:12',
-        //     'exp_year' => 'required|numeric|min:' . date('Y')
-        // ]);
+   public function processPayment(Request $request)
+{
+    // Basic validation
+    $validator = Validator::make($request->all(), [
+        'amount'      => 'required|numeric|min:1',
+        'stripeToken' => 'required|string',
+        // Agar card fields client se aate hain to unki validation yahan mat rakho;
+        // Stripe Elements/Payment Element se token/PM banakar bhejo (PCI safer).
+    ]);
 
-        // Stripe::setApiKey(config('services.stripe.secret'));
-        Stripe::setApiKey('***REMOVED***');
-
-        try {
-            // Create a charge
-            $charge = Charge::create([
-                'amount' => $request->amount * 100, // Amount in cents
-                'currency' => 'usd',
-                'source' => $request->stripeToken,
-                'description' => 'Test payment',
-            ]);
-
-            return back()->with('success', 'Payment successful!');
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
-        }
+    if ($validator->fails()) {
+        return back()->with('error', $validator->errors()->first());
     }
+
+    // ✅ Secret env/config se lo (config/services.php me 'stripe.secret' set ho)
+    Stripe::setApiKey(config('services.stripe.secret'));
+
+    try {
+        // Amount ko hamesha integer subunits me bhejo (paise/cents)
+        $amountInCents = (int) round($request->amount * 100);
+
+        $charge = Charge::create([
+            'amount'      => $amountInCents,
+            'currency'    => 'usd',  // INR use karni ho to 'inr'
+            'source'      => $request->stripeToken, // Stripe Elements se mila token
+            'description' => 'Bid/Order payment',
+            // 'metadata'  => ['order_id' => '...'],
+        ]);
+
+        // (Optional) charge status check
+        if (($charge->status ?? '') !== 'succeeded') {
+            return back()->with('error', 'Payment not successful. Please try again.');
+        }
+
+        return back()->with('success', 'Payment successful!');
+    } catch (\Throwable $e) {
+        // \Log::error('Stripe charge failed', ['msg' => $e->getMessage()]);
+        return back()->with('error', $e->getMessage());
+    }
+}
 
     public function gigBillSubmit(Request $request)
-    {
-        Stripe::setApiKey('***REMOVED***');
+{
+    // ✅ Basic validation
+    $validator = Validator::make($request->all(), [
+        'amount'      => 'required|numeric|min:1',
+        'stripeToken' => 'required|string',
+        'gig_id'      => 'required|integer|exists:gigs,id',
+        'first_name'  => 'required|string|max:100',
+        'last_name'   => 'nullable|string|max:100',
+        'phone'       => 'required|string|max:20',
+        'email'       => 'required|email',
+        'address'     => 'required|string|max:255',
+        'city'        => 'required|string|max:100',
+        'state'       => 'required|string|max:100',
+        'zip'         => 'required|string|max:20',
+        'country'     => 'required|string|max:100',
+    ]);
 
-        try {
-            // Create a charge
-            $charge = Charge::create([
-                'amount' => $request->amount * 100, // Amount in cents
-                'currency' => 'usd',
-                'source' => $request->stripeToken,
-                'description' => 'Test payment',
-            ]);
+    if ($validator->fails()) {
+        return back()->with('error', $validator->errors()->first())->withInput();
+    }
 
+    // ✅ Secret ENV se
+    Stripe::setApiKey(config('services.stripe.secret'));
 
-            $user = Auth::user();
+    $user = Auth::user();
+    $amountInCents = (int) round($request->amount * 100);
 
-            $addBill = new GigCheckout();
-            $addBill->user_id = $user->id;
-            $addBill->gig_id = $request->gig_id;
-            $addBill->first_name = $request->first_name;
-            $addBill->last_name = $request->last_name;
-            $addBill->phone = $request->phone;
-            $addBill->email = $request->email;
-            $addBill->address = $request->address;
-            $addBill->city = $request->city;
-            $addBill->state = $request->state;
-            $addBill->zip = $request->zip;
-            $addBill->country = $request->country;
-            $addBill->subtotal = $request->amount;
-            $addBill->save();
-    
-            $gigDetails = Gig::where('id', $request->gig_id)->first();
-            $timestamp = Carbon::now()->format('dmyHis');
-            $transactionId = 'SWBI'.$user->id.''.$timestamp;
-    
-            $add_transaction = new Transaction();
-            $add_transaction->business_id = $user->id;
-            $add_transaction->influencer_id = $gigDetails->user_id;
-            $add_transaction->type = "Gig";
-            $add_transaction->details = "Gig purchased, Title - " .$gigDetails->title;
-            $add_transaction->transaction_id = $transactionId;
-            $add_transaction->amount = $request->amount;
-            $add_transaction->save();
-    
-            $add_order = new GigOrder();
-            $add_order->business_id = $user->id;
-            $add_order->influencer_id = $gigDetails->user_id;
-            $add_order->gig_id = $request->gig_id;
-            $add_order->save();
+    try {
+        // 1) **Charge on Stripe**
+        $charge = Charge::create([
+            'amount'      => $amountInCents,
+            'currency'    => 'usd', // INR chahiye to 'inr'
+            'source'      => $request->stripeToken,
+            'description' => 'Gig purchase',
+            'metadata'    => [
+                'gig_id'   => (string) $request->gig_id,
+                'user_id'  => (string) ($user->id ?? ''),
+                'email'    => (string) $request->email,
+            ],
+        ]);
 
-            $paymentRequest = new PaymentRequest();
-            $paymentRequest->made_by = $user->id;
-            $paymentRequest->payment_to = $gigDetails->user_id;
-            $paymentRequest->amount = $request->amount;
-            $paymentRequest->gig_order_id = $add_order->id;
-            $paymentRequest->save();
-    
-            $notification = new Notification();
-            $notification->user_id = $gigDetails->user_id;
-            $notification->title = $user->first_name. ' ' .$user->last_name. ' purchased your gig.';
-            $notification->link = 'gig-order';
-            $notification->save();
-            
-            // return back()->with('success', 'Payment successful!');
-            return redirect()->route('business.gig.invoice', $addBill->id)->with('success', 'Gig purchased successfully.');
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
+        if (($charge->status ?? '') !== 'succeeded') {
+            return back()->with('error', 'Payment not successful. Please try again.');
         }
 
-        // return view('business.gigs_invoice');
-        // return redirect()->route('business.gig.invoice', $addBill->id)->with('success', 'Gig purchased successfully.');
+        // 2) **DB writes atomic** (either all save or none)
+        $gigDetails = Gig::findOrFail($request->gig_id);
+
+        $result = DB::transaction(function () use ($request, $user, $gigDetails) {
+            // GigCheckout (bill)
+            $addBill = new GigCheckout();
+            $addBill->user_id   = $user->id;
+            $addBill->gig_id    = $request->gig_id;
+            $addBill->first_name= $request->first_name;
+            $addBill->last_name = $request->last_name;
+            $addBill->phone     = $request->phone;
+            $addBill->email     = $request->email;
+            $addBill->address   = $request->address;
+            $addBill->city      = $request->city;
+            $addBill->state     = $request->state;
+            $addBill->zip       = $request->zip;
+            $addBill->country   = $request->country;
+            $addBill->subtotal  = $request->amount;
+            $addBill->save();
+
+            // Transaction log
+            $timestamp     = Carbon::now()->format('dmyHis');
+            $transactionId = 'SWGI' . $user->id . $timestamp;
+
+            $add_transaction = new Transaction();
+            $add_transaction->business_id    = $user->id;
+            $add_transaction->influencer_id  = $gigDetails->user_id;
+            $add_transaction->type           = "Gig";
+            $add_transaction->details        = "Gig purchased, Title - " . ($gigDetails->title ?? 'N/A');
+            $add_transaction->transaction_id = $transactionId;
+            $add_transaction->amount         = $request->amount;
+            $add_transaction->save();
+
+            // GigOrder
+            $add_order = new GigOrder();
+            $add_order->business_id   = $user->id;
+            $add_order->influencer_id = $gigDetails->user_id;
+            $add_order->gig_id        = $request->gig_id;
+            $add_order->save();
+
+            // PaymentRequest (for escrow/release later)
+            $paymentRequest = new PaymentRequest();
+            $paymentRequest->made_by      = $user->id;
+            $paymentRequest->payment_to   = $gigDetails->user_id;
+            $paymentRequest->amount       = $request->amount;
+            $paymentRequest->gig_order_id = $add_order->id;
+            $paymentRequest->save();
+
+            // Notification
+            $notification = new Notification();
+            $notification->user_id = $gigDetails->user_id;
+            $notification->title   = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) . ' purchased your gig.';
+            $notification->link    = 'gig-order';
+            $notification->save();
+
+            return $addBill->id;
+        });
+
+        return redirect()
+            ->route('business.gig.invoice', $result)
+            ->with('success', 'Gig purchased successfully.');
+
+    } catch (\Throwable $e) {
+        // \Log::error('gigBillSubmit failed', ['msg' => $e->getMessage()]);
+        return back()->with('error', $e->getMessage())->withInput();
     }
+}
 
     public function gigInvoice($bill_id)
     {
