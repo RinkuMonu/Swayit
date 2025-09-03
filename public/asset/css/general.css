@@ -1,0 +1,247 @@
+/* signup page css starts */
+.loginBackg {
+    background: #2A2349;
+    min-height: 100vh;
+    padding: 30px 12px;
+}
+
+.loginSection {
+    text-align: center;
+}
+
+.loginLogo {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 30px;
+}
+
+.loginforms {
+    width: 100%;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 37px rgba(8, 21, 66, 0.05);
+    background-color: #fff;
+}
+
+.createAccount {
+    text-align: start;
+    margin-bottom: 5%;
+    font-weight: 700;
+}
+
+.Names {
+    display: flex;
+    justify-content: flex-start;
+    color: #BF987F;
+}
+
+.enterPersonalDetails {
+    text-align: start;
+    margin-bottom: 25px;
+    font-size: 16px;
+    font-weight: 500;
+    color: #898989;
+}
+
+input.form-control {
+    background-color: #fff;
+    transition: all 0.3s ease;
+}
+
+.checkboxInput {
+    padding-right: 5vw;
+}
+
+.agreeWith {
+    padding-left: 0.7vw;
+    font-weight: 500;
+}
+
+.agreeWith a {
+    color: #2979FF80;
+    text-decoration: none;
+}
+
+.createAccountButtonSignup {
+    margin-top: 17px;
+    padding: 6px 24px;
+    font-weight: 700;
+    font-size: 19px;
+}
+
+.createAccountButtonSignup1 {
+    margin-top: 17px;
+    padding: 6px 24px;
+    font-weight: 700;
+    font-size: 19px;
+    margin-left: 2%;
+    background-color: #BF987F;
+}
+
+.signUpBorderInput {
+    border: 1px solid #2979FF !important;
+    border-radius: 5px !important;
+}
+
+.signupLogoPage {
+    width: 50% !important;
+    margin-left: 3%;
+}
+
+.CreateHeadingSignUp {
+    margin-left: 4%;
+    color: #fff;
+    font-size: 40px;
+    font-weight: 700;
+}
+
+.CreateHeadingSignUp11 {
+    margin-left: 4%;
+    color: #fff;
+    font-size: 25px;
+    font-weight: 700;
+}
+
+.GirlSignupImage {
+    position: absolute;
+    width: 32% !important;
+    left: 58%;
+    top: 25%;
+}
+
+.GirlSignupImage2 {
+    position: absolute;
+    width: 22% !important;
+    left: 58%;
+    top: 39%;
+}
+
+.GirlSignupImageotp22 {
+    position: absolute;
+    width: 18% !important;
+    left: 59%;
+    top: 32% !important;
+}
+
+.GirlSignupImage1 {
+    width: 100%;
+}
+
+.GirlSignupImage22 {
+    width: 100%;
+}
+
+.otpSection {
+    padding-top: 5%;
+}
+
+.forgetPasswordSection {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.forgetPassword {
+    display: flex;
+    justify-content: start;
+    text-align: center;
+    margin-top: 3%;
+    margin-left: 1%;
+}
+
+.forgotPasswordSection {
+    margin-right: 4%;
+}
+
+.borderColored {
+    border: 1px solid #2979FF !important;
+}
+
+.coloredLoginPage {
+    color: #BF987F;
+}
+
+.css-1jqq78o-placeholder {
+    grid-area: 1 / 1 / 2 / 3;
+    color: hsl(0, 0%, 50%);
+    margin-left: 2px;
+    box-sizing: border-box;
+    margin-right: auto !important;
+}
+
+.heddenPhone {
+    display: none;
+}
+
+.password-toggle-icon {
+    position: absolute;
+    top: 5px;
+    right: 22px;
+    z-index: 2;
+}
+/* signup page css ends */
+
+/* sign up otp page css starts */
+
+/* sign up otp page css ends */
+
+/* Linked accound css start */
+.linkSection {
+    text-align: center;
+    margin-top: 2%;
+}
+
+.cardLinkedAccount {
+    margin-bottom: 30px;
+    width: 100%;
+    height: 684px;
+    border: none;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+    border-radius: 15px;
+    box-shadow: 0px 9px 20px rgba(46, 35, 94, 0.07);
+    background-color: #ffff;
+}
+
+.tableCols {
+    width: 15%;
+}
+
+.tableCols2 {
+    width: 70%;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+td.tableCols3 {
+    display: flex;
+    justify-content: start;
+    margin-top: 1vw;
+}
+
+.icons {
+    font-size: 30px;
+    padding: 10px;
+}
+
+.importLine {
+    font-size: 18px;
+    font-weight: 400;
+}
+
+.btn-secondary {
+    background-color: #f73164 !important;
+    border-color: #f73164 !important;
+}
+
+.skipNow {
+    text-align: center;
+    padding-top: 22px;
+}   
+
+.skipButton {
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 25px;
+}
+/* Linked accound css End */
