@@ -6,6 +6,7 @@
             $aboutFeature = \App\Models\AboutFeatureContent::orderBy('id', 'desc')->first();
         @endphp
         <div class="row">
+          about
             <div class="col-md-6">
                 <div class="aboutusMainhading">
                     <h1 class="aboutusMainhading1">{{ $aboutPage->title_one }}</h1>
